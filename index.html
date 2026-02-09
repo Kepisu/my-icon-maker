@@ -4,55 +4,95 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Icon Maker</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- 重要: 転送モードなら、余計なものを読み込まず即座に飛ばす -->
+    <script>
+        (function() {
+            var params = new URLSearchParams(window.location.search);
+            var url = params.get('url');
+            if (url) {
+                // httpがない場合の補完
+                if (!url.startsWith('http')) url = 'https://' + url;
+                
+                // 履歴に残さない replace を使用
+                window.location.replace(url);
+                
+                // 以降の処理を止めるためのフラグ
+                window.isRedirecting = true;
+            }
+        })();
+    </script>
+
+    <!-- 以下のライブラリは、編集画面のときだけ読み込む（高速化） -->
+    <script>
+        if (!window.isRedirecting) {
+            document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+            document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
+        }
+    </script>
+
     <style>
-        /* iOSのようなスムーズなスクロールとタップ操作 */
+        /* iOSのようなスムーズな操作感 */
         body {
             -webkit-touch-callout: none;
             -webkit-tap-highlight-color: transparent;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
-        .ios-btn {
-            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-            cursor: pointer; /* マウスカーソルを指マークに */
+        /* 転送中に表示するシンプルなスタイル（ライブラリ依存なし） */
+        .redirect-msg {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+            color: #666;
+            background-color: #fff;
         }
-        .ios-btn:active {
-            transform: scale(0.96);
-            opacity: 0.9;
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
         }
-        /* アニメーション */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-            animation: fadeIn 0.4s ease-out forwards;
-        }
-        @keyframes bounce-slow {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
-        .animate-bounce-slow {
-            animation: bounce-slow 2s infinite;
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* 確実に隠すためのクラス */
-        .force-hidden {
-            display: none !important;
-        }
+        .ios-btn { cursor: pointer; transition: opacity 0.2s; }
+        .ios-btn:active { opacity: 0.7; }
+        
+        /* 確実に隠す */
+        .hidden { display: none !important; }
     </style>
-    <!-- ここに動的にアイコンが挿入されます -->
+    <!-- アイコン用プレースホルダー -->
     <link rel="apple-touch-icon" href="">
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
 
-    <!-- アプリケーションのコンテナ -->
+    <!-- === 純粋なHTML/JSだけの転送画面 (ライブラリ読み込み待ちすらしない) === -->
+    <div id="redirect-overlay" style="display: none;" class="redirect-msg">
+        <div class="spinner"></div>
+        <p>転送中...</p>
+    </div>
+
+    <script>
+        // 転送モードなら、即座に簡易画面を表示して終了
+        if (window.isRedirecting) {
+            document.getElementById('redirect-overlay').style.display = 'flex';
+            // bodyの中身をこれ以外レンダリングさせない
+            document.body.style.backgroundColor = '#fff';
+            throw new Error("Redirecting..."); // 以降のスクリプト実行を強制停止
+        }
+    </script>
+
+    <!-- === ここから下は編集ツール用の画面（転送時は無視される） === -->
+
     <div id="app" class="max-w-md mx-auto min-h-screen flex flex-col relative overflow-hidden bg-gray-50">
         
-        <!-- === 画面1: エディター === -->
+        <!-- エディター画面 -->
         <div id="editor-screen" class="p-6 flex flex-col gap-6 animate-fade-in">
             <header class="flex items-center gap-2 py-2">
                 <div class="bg-gradient-to-tr from-blue-500 to-indigo-600 p-2 rounded-lg text-white shadow-md">
@@ -97,22 +137,20 @@
                 </div>
             </div>
 
-            <button id="create-btn" style="cursor: pointer;" class="ios-btn w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 text-lg mt-2 cursor-pointer relative z-10">
+            <button id="create-btn" class="ios-btn w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 text-lg mt-2 relative z-10">
                 アイコン作成準備
                 <i data-lucide="arrow-down" class="w-5 h-5"></i>
             </button>
         </div>
 
-        <!-- === 画面2: 準備完了 (ホーム追加待ち) === -->
-        <!-- style="display: none;" を追加して確実に隠す -->
+        <!-- 準備完了画面 -->
         <div id="ready-screen" style="display: none;" class="absolute inset-0 bg-slate-900 text-white flex-col z-20">
-            <!-- 背景エフェクト -->
             <div class="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none overflow-hidden">
                 <div class="absolute top-[-50px] left-[-50px] w-64 h-64 bg-purple-500 rounded-full blur-3xl"></div>
                 <div class="absolute bottom-[-50px] right-[-50px] w-80 h-80 bg-blue-500 rounded-full blur-3xl"></div>
             </div>
 
-            <div class="flex-1 flex flex-col items-center justify-center p-6 z-10 animate-fade-in">
+            <div class="flex-1 flex flex-col items-center justify-center p-6 z-10">
                 <div class="bg-white/10 backdrop-blur-lg rounded-3xl p-8 w-full max-w-sm text-center border border-white/20 shadow-2xl">
                     <div class="mb-6 flex justify-center">
                         <div class="relative">
@@ -131,180 +169,102 @@
                         を選んでください。
                     </p>
                     
-                    <button id="reset-btn" class="text-sm text-gray-400 hover:text-white flex items-center justify-center w-full gap-2 py-2 cursor-pointer">
+                    <button id="reset-btn" class="ios-btn text-sm text-gray-400 hover:text-white flex items-center justify-center w-full gap-2 py-2">
                         <i data-lucide="x" class="w-4 h-4"></i> 設定をやり直す
                     </button>
                 </div>
             </div>
 
-            <div class="pb-10 pt-4 flex flex-col items-center justify-end z-20 animate-bounce-slow">
+            <div class="pb-10 pt-4 flex flex-col items-center justify-end z-20 animate-bounce">
                 <p class="text-sm font-bold mb-2 text-blue-300">ここをタップ！</p>
                 <i data-lucide="arrow-down" class="w-8 h-8 text-blue-300"></i>
             </div>
         </div>
 
-        <!-- === 画面3: リダイレクト中 === -->
-        <!-- style="display: none;" を追加して確実に隠す -->
-        <div id="redirect-screen" style="display: none;" class="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center absolute inset-0 z-30">
-            <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500 mb-6"></div>
-            <h1 class="text-xl font-bold text-gray-800 mb-2">転送中...</h1>
-            <p id="redirect-url-display" class="text-gray-500 mb-8 text-sm truncate w-full max-w-xs"></p>
-            <a id="manual-link" href="#" class="bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2 cursor-pointer">
-                <i data-lucide="external-link" class="w-5 h-5"></i> 今すぐ開く
-            </a>
-        </div>
-
     </div>
 
     <script>
-        // Lucideアイコンの初期化
-        try {
-            lucide.createIcons();
-        } catch (e) {
-            console.error("Icons failed to load", e);
-        }
+        // エディター用のスクリプト（転送時は実行しない）
+        if (!window.isRedirecting) {
+            
+            // アイコン初期化
+            try { lucide.createIcons(); } catch(e) {}
 
-        // 状態管理
-        let imageData = null;
-        let targetUrl = "";
-        let appTitle = "";
+            // 要素取得
+            const editorScreen = document.getElementById('editor-screen');
+            const readyScreen = document.getElementById('ready-screen');
+            const imageInput = document.getElementById('image-input');
+            const urlInput = document.getElementById('url-input');
+            const titleInput = document.getElementById('title-input');
+            const previewImg = document.getElementById('preview-img');
+            const previewPlaceholder = document.getElementById('preview-placeholder');
+            const previewTitle = document.getElementById('preview-title');
+            const readyImg = document.getElementById('ready-img');
 
-        // 要素の取得
-        const editorScreen = document.getElementById('editor-screen');
-        const readyScreen = document.getElementById('ready-screen');
-        const redirectScreen = document.getElementById('redirect-screen');
-        
-        const imageInput = document.getElementById('image-input');
-        const urlInput = document.getElementById('url-input');
-        const titleInput = document.getElementById('title-input');
-        
-        const previewImg = document.getElementById('preview-img');
-        const previewPlaceholder = document.getElementById('preview-placeholder');
-        const previewTitle = document.getElementById('preview-title');
-        const readyImg = document.getElementById('ready-img');
+            let imageData = null;
+            let targetUrl = "";
+            let appTitle = "";
 
-        // 画面切り替え用のヘルパー関数（安全に表示・非表示を切り替える）
-        function showScreen(screenName) {
-            // 一旦すべて隠す
-            editorScreen.style.display = 'none';
-            readyScreen.style.display = 'none';
-            redirectScreen.style.display = 'none';
+            // 画像選択
+            imageInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        imageData = reader.result;
+                        previewImg.src = imageData;
+                        previewImg.classList.remove('hidden');
+                        previewPlaceholder.classList.add('hidden');
+                        readyImg.src = imageData;
+                        updateFavicon(imageData);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
 
-            // 指定されたものを表示
-            if (screenName === 'editor') {
-                editorScreen.style.display = 'flex';
-            } else if (screenName === 'ready') {
+            // タイトル入力
+            titleInput.addEventListener('input', (e) => {
+                appTitle = e.target.value;
+                previewTitle.textContent = appTitle || 'アプリ名';
+            });
+
+            // 作成ボタン
+            document.getElementById('create-btn').addEventListener('click', () => {
+                targetUrl = urlInput.value;
+                appTitle = titleInput.value;
+
+                if (!targetUrl) { alert('URLを入力してください'); return; }
+                if (!imageData) { alert('アイコン画像を選択してください'); return; }
+                if (!targetUrl.startsWith('http')) targetUrl = 'https://' + targetUrl;
+
+                // 画面切り替え
+                editorScreen.style.display = 'none';
                 readyScreen.style.display = 'flex';
-            } else if (screenName === 'redirect') {
-                redirectScreen.style.display = 'flex';
+
+                // URLパラメータ更新
+                const newUrl = `${window.location.pathname}?url=${encodeURIComponent(targetUrl)}&title=${encodeURIComponent(appTitle)}`;
+                window.history.replaceState(null, '', newUrl);
+                document.title = appTitle;
+                updateFavicon(imageData);
+            });
+
+            // リセット
+            document.getElementById('reset-btn').addEventListener('click', () => {
+                readyScreen.style.display = 'none';
+                editorScreen.style.display = 'flex';
+                window.history.replaceState(null, '', window.location.pathname);
+                document.title = "Icon Maker";
+            });
+
+            function updateFavicon(dataUrl) {
+                const links = document.querySelectorAll("link[rel*='icon']");
+                links.forEach(link => link.remove());
+                const link = document.createElement('link');
+                link.type = 'image/png';
+                link.rel = 'apple-touch-icon';
+                link.href = dataUrl;
+                document.getElementsByTagName('head')[0].appendChild(link);
             }
-        }
-
-        // URLパラメータの解析（リダイレクトモードかどうか）
-        const params = new URLSearchParams(window.location.search);
-        const paramUrl = params.get('url');
-        const paramTitle = params.get('title');
-
-        if (paramUrl) {
-            // リダイレクトモード
-            showScreen('redirect');
-            
-            if (paramTitle) document.title = paramTitle;
-            
-            document.getElementById('redirect-url-display').textContent = paramUrl;
-            document.getElementById('manual-link').href = paramUrl;
-
-            // 自動リダイレクト
-            setTimeout(() => {
-                window.location.href = paramUrl;
-            }, 500);
-        } else {
-            // 通常モード（エディターを表示）
-            showScreen('editor');
-        }
-
-        // 画像選択時の処理
-        imageInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    imageData = reader.result;
-                    previewImg.src = imageData;
-                    previewImg.classList.remove('hidden');
-                    previewPlaceholder.classList.add('hidden');
-                    readyImg.src = imageData;
-                    
-                    // すぐにapple-touch-iconを更新しておく（重要）
-                    updateFavicon(imageData);
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // タイトル入力時の処理
-        titleInput.addEventListener('input', (e) => {
-            appTitle = e.target.value;
-            previewTitle.textContent = appTitle || 'アプリ名';
-        });
-
-        // 作成ボタン
-        document.getElementById('create-btn').addEventListener('click', () => {
-            targetUrl = urlInput.value;
-            appTitle = titleInput.value;
-
-            if (!targetUrl) {
-                alert('URLを入力してください');
-                return;
-            }
-            if (!imageData) {
-                alert('アイコン画像を選択してください');
-                return;
-            }
-
-            // URLの整形
-            if (!targetUrl.startsWith('http')) {
-                targetUrl = 'https://' + targetUrl;
-            }
-
-            // 画面切り替え
-            showScreen('ready');
-            
-            // 重要: URLパラメータを書き換える
-            // これにより、ホーム画面に追加されたときのURLが確定する
-            const newUrl = `${window.location.pathname}?url=${encodeURIComponent(targetUrl)}&title=${encodeURIComponent(appTitle)}`;
-            window.history.replaceState(null, '', newUrl);
-
-            // タイトル変更
-            document.title = appTitle;
-
-            // 念のためアイコンを再適用
-            updateFavicon(imageData);
-        });
-
-        // リセットボタン
-        document.getElementById('reset-btn').addEventListener('click', () => {
-            showScreen('editor');
-            
-            // URLを元に戻す
-            window.history.replaceState(null, '', window.location.pathname);
-            document.title = "Icon Maker";
-        });
-
-        // ファビコン/WebClipアイコンを強制更新する関数
-        function updateFavicon(dataUrl) {
-            // 既存のアイコンタグをすべて削除
-            const links = document.querySelectorAll("link[rel*='icon']");
-            links.forEach(link => link.remove());
-
-            // 新しいタグを作成
-            const link = document.createElement('link');
-            link.type = 'image/png';
-            link.rel = 'apple-touch-icon';
-            link.href = dataUrl;
-            
-            // headに追加
-            document.getElementsByTagName('head')[0].appendChild(link);
         }
     </script>
 </body>
